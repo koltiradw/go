@@ -1924,7 +1924,7 @@ func (f matchStringOnly) ImportPath() string                          { return "
 func (f matchStringOnly) StartTestLog(io.Writer)                      {}
 func (f matchStringOnly) StopTestLog() error                          { return errMain }
 func (f matchStringOnly) SetPanicOnExit0(bool)                        {}
-func (f matchStringOnly) CoordinateFuzzing(time.Duration, int64, time.Duration, int64, int, []corpusEntry, []reflect.Type, string, string) error {
+func (f matchStringOnly) CoordinateFuzzing(time.Duration, int64, time.Duration, int64, time.Duration, int, []corpusEntry, []reflect.Type, string, string) error {
 	return errMain
 }
 func (f matchStringOnly) RunFuzzWorker(func(corpusEntry) error) error { return errMain }
@@ -1980,7 +1980,7 @@ type testDeps interface {
 	StartTestLog(io.Writer)
 	StopTestLog() error
 	WriteProfileTo(string, io.Writer, int) error
-	CoordinateFuzzing(time.Duration, int64, time.Duration, int64, int, []corpusEntry, []reflect.Type, string, string) error
+	CoordinateFuzzing(time.Duration, int64, time.Duration, int64, time.Duration, int, []corpusEntry, []reflect.Type, string, string) error
 	RunFuzzWorker(func(corpusEntry) error) error
 	ReadCorpus(string, []reflect.Type) ([]corpusEntry, error)
 	CheckCorpus([]any, []reflect.Type) error

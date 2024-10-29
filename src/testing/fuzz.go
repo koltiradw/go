@@ -21,6 +21,7 @@ func initFuzzFlags() {
 	matchFuzz = flag.String("test.fuzz", "", "run the fuzz test matching `regexp`")
 	flag.Var(&fuzzDuration, "test.fuzztime", "time to spend fuzzing; default is to run indefinitely")
 	flag.Var(&minimizeDuration, "test.fuzzminimizetime", "time to spend minimizing a value after finding a failing input")
+	flag.Var(&exitOnTime, "test.exitontime", "time to spend fuzzing without new interesting inputs; default is to run indefinitely")
 
 	fuzzCacheDir = flag.String("test.fuzzcachedir", "", "directory where interesting fuzzing inputs are stored (for use only by cmd/go)")
 	isFuzzWorker = flag.Bool("test.fuzzworker", false, "coordinate with the parent process to fuzz random values (for use only by cmd/go)")
@@ -30,6 +31,7 @@ var (
 	matchFuzz        *string
 	fuzzDuration     durationOrCountFlag
 	minimizeDuration = durationOrCountFlag{d: 60 * time.Second, allowZero: true}
+	exitOnTime       = durationOrCountFlag{d: 0 * time.Second}
 	fuzzCacheDir     *string
 	isFuzzWorker     *bool
 
@@ -354,6 +356,7 @@ func (f *F) Fuzz(ff any) {
 			int64(fuzzDuration.n),
 			minimizeDuration.d,
 			int64(minimizeDuration.n),
+			exitOnTime.d,
 			*parallel,
 			f.corpus,
 			types,

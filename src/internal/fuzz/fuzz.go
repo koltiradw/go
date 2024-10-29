@@ -52,6 +52,10 @@ type CoordinateFuzzingOpts struct {
 	// minimization will be disabled.
 	MinimizeLimit int64
 
+	// ExitOnTime is the amount of wall clock time to spend fuzzing after finding
+	// a new interesting input. If zero, there will be no time limit.
+	ExitOnTime time.Duration
+
 	// parallel is the number of worker processes to run in parallel. If zero,
 	// CoordinateFuzzing will run GOMAXPROCS workers.
 	Parallel int
@@ -204,6 +208,9 @@ func CoordinateFuzzing(ctx context.Context, opts CoordinateFuzzingOpts) (err err
 
 	c.logStats()
 	for {
+		if c.opts.ExitOnTime > 0 && c.timeoutOfNewInsterestingInput >= c.opts.ExitOnTime {
+			stop(nil)
+		}
 		// If there is an execution limit, and we've reached it, stop.
 		if c.opts.Limit > 0 && c.count >= c.opts.Limit {
 			stop(nil)
@@ -343,6 +350,7 @@ func CoordinateFuzzing(ctx context.Context, opts CoordinateFuzzingOpts) (err err
 						c.updateCoverage(keepCoverage)
 						c.inputQueue.enqueue(result.entry)
 						c.interestingCount++
+						c.lastNewInterestingInputTime = time.Now()
 						if shouldPrintDebugInfo() {
 							c.debugLogf(
 								"new interesting input, id: %s, parent: %s, gen: %d, new bits: %d, total bits: %d, size: %d, exec time: %s",
@@ -577,6 +585,12 @@ type coordinator struct {
 	// Used for logging.
 	startTime time.Time
 
+	// lastNewInterestingInputTimeis the time when the fuzzer found a new interesting input
+	lastNewInterestingInputTime time.Time
+
+	// timeoutOfNewInsterestingInput is the time spent fuzzing without new interesting input
+	timeoutOfNewInsterestingInput time.Duration
+
 	// inputC is sent values to fuzz by the coordinator. Any worker may receive
 	// values from this channel. Workers send results to resultC.
 	inputC chan fuzzInput
@@ -660,13 +674,14 @@ func newCoordinator(opts CoordinateFuzzingOpts) (*coordinator, error) {
 		}
 	}
 	c := &coordinator{
-		opts:        opts,
-		startTime:   time.Now(),
-		inputC:      make(chan fuzzInput),
-		minimizeC:   make(chan fuzzMinimizeInput),
-		resultC:     make(chan fuzzResult),
-		timeLastLog: time.Now(),
-		corpus:      corpus{hashes: make(map[[sha256.Size]byte]bool)},
+		opts:                        opts,
+		startTime:                   time.Now(),
+		lastNewInterestingInputTime: time.Now(),
+		inputC:                      make(chan fuzzInput),
+		minimizeC:                   make(chan fuzzMinimizeInput),
+		resultC:                     make(chan fuzzResult),
+		timeLastLog:                 time.Now(),
+		corpus:                      corpus{hashes: make(map[[sha256.Size]byte]bool)},
 	}
 	if err := c.readCache(); err != nil {
 		return nil, err
@@ -736,7 +751,8 @@ func (c *coordinator) logStats() {
 		rate := float64(c.count-c.countLastLog) / now.Sub(c.timeLastLog).Seconds()
 		if coverageEnabled {
 			total := c.warmupInputCount + c.interestingCount
-			fmt.Fprintf(c.opts.Log, "fuzz: elapsed: %s, execs: %d (%.0f/sec), new interesting: %d (total: %d)\n", c.elapsed(), c.count, rate, c.interestingCount, total)
+			c.timeoutOfNewInsterestingInput = time.Since(c.lastNewInterestingInputTime).Round(1 * time.Second)
+			fmt.Fprintf(c.opts.Log, "fuzz: elapsed: %s, execs: %d (%.0f/sec), new interesting: %d (total: %d), last new interesting: %s\n", c.elapsed(), c.count, rate, c.interestingCount, total, c.timeoutOfNewInsterestingInput)
 		} else {
 			fmt.Fprintf(c.opts.Log, "fuzz: elapsed: %s, execs: %d (%.0f/sec)\n", c.elapsed(), c.count, rate)
 		}
